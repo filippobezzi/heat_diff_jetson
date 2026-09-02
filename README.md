@@ -8,7 +8,7 @@ High-performance scientific computing simulation of heterogeneous 3D transient t
 
 ---
 
-## 📌 Physical Problem & Governing Equations
+## Physical Problem & Governing Equations
 
 The system models unsteady, three-dimensional heat conduction through a heterogeneous medium governed by the variable-diffusivity heat equation:
 
@@ -31,7 +31,7 @@ $$\Delta t \le \frac{\Delta x^2}{6 \cdot \max(\alpha)}$$
 
 ---
 
-## 🚀 Implementation Architectures
+## Implementation Architectures
 
 | Implementation | Backend | Memory Access Strategy | Arithmetic Cost | Compulsory DRAM Traffic |
 | :--- | :--- | :--- | :--- | :--- |
@@ -49,7 +49,7 @@ $$\Delta t \le \frac{\Delta x^2}{6 \cdot \max(\alpha)}$$
 
 ---
 
-## 🔬 Mathematical Verification (MMS)
+## Mathematical Verification (MMS)
 
 Code verification is performed using the **Method of Manufactured Solutions (MMS)** on a 3D trigonometric test field:
 
@@ -59,7 +59,7 @@ Grid convergence tests across grid resolutions $N \in \{16, 32, 64, 128\}$ confi
 
 ---
 
-## 📊 Benchmark Results (NVIDIA Jetson Nano)
+## Benchmark Results (NVIDIA Jetson Nano)
 
 * **Platform:** NVIDIA Jetson Nano Developer Kit (4× ARM Cortex-A57 @ 1.43 GHz, 128-core Maxwell GPU @ 921 MHz, 4 GB unified LPDDR4 @ 25.6 GB/s).
 
@@ -73,7 +73,7 @@ Grid convergence tests across grid resolutions $N \in \{16, 32, 64, 128\}$ confi
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 heat_diff_jetson/
@@ -112,7 +112,7 @@ heat_diff_jetson/
 
 ---
 
-## 🛠️ Build & Execution Instructions
+## Build & Execution Instructions
 
 ### Prerequisites
 * **C Compilers:** `gcc` with OpenMP support (`-fopenmp`)
@@ -169,5 +169,5 @@ python3 plot_results.py --plot all
 
 ---
 
-## 📄 License
+## License
 Academic project for the **Modern Computing for Physics (MCP)** course at the University of Padua (UniPD). Distributed under the MIT License.
