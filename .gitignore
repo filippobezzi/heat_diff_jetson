@@ -1,0 +1,18 @@
+# Binaries
+heat_cube_seq_3d
+heat_cube_omp_3d
+heat_cube_cuda_3d
+heat_cube_omp_naive_3d
+heat_mms_seq_3d
+heat_mms_omp_3d
+heat_mms_cuda_3d
+*.o
+*.out
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,81 @@
+# ==============================================================================
+# Makefile for 3D Heat Transfer Simulation on NVIDIA Jetson Nano (Linux aarch64)
+# Hardware: Quad-core ARM Cortex-A57 + 128-core NVIDIA Maxwell GPU (sm_53)
+# ==============================================================================
+
+# Compilers
+ifeq ($(shell uname -s), Darwin)
+  CC := $(shell which gcc-16 2>/dev/null || which gcc-14 2>/dev/null || which gcc-13 2>/dev/null || echo gcc)
+else
+  CC := gcc
+endif
+NVCC := $(shell which nvcc 2>/dev/null || echo /usr/local/cuda/bin/nvcc)
+
+# Compiler & Linker Flags for Jetson Nano
+CFLAGS     := -O3  	# O3: maximum compiler optimization
+OMP_FLAGS  := -fopenmp	# enable OpenMP multithreading support in GCC
+NVCC_FLAGS := -O3 -arch=sm_53 --maxrregcount=32 -std=c++11
+LDLIBS     := -lm	# links standard math library
+
+# Binaries to build
+TARGETS_CPU  := heat_cube_seq_3d heat_cube_omp_3d heat_mms_seq_3d heat_mms_omp_3d
+TARGETS_CUDA := heat_cube_cuda_3d heat_mms_cuda_3d
+TARGETS_ALL  := $(TARGETS_CPU) $(TARGETS_CUDA)
+
+# Default rule: build all CPU and GPU targets
+all: $(TARGETS_ALL)
+
+cpu: $(TARGETS_CPU)
+
+cuda: $(TARGETS_CUDA)
+
+# ------------------------------------------------------------------------------
+# 3D Physical Simulation Binaries (Heterogeneous Copper Cube in Water)
+# ------------------------------------------------------------------------------
+
+# 1. Sequential C baseline
+heat_cube_seq_3d: heat_cube_seq_3d.c heat_3d.h
+	$(CC) $(CFLAGS) $< -o $@ $(LDLIBS)
+
+# 2. OpenMP Parallel CPU solver
+heat_cube_omp_3d: heat_cube_omp_3d.c heat_3d.h
+	$(CC) $(CFLAGS) $(OMP_FLAGS) $< -o $@ $(LDLIBS)
+
+# 3. CUDA GPU solver (Maxwell sm_53)
+heat_cube_cuda_3d: heat_cube_cuda_3d.cu heat_3d.h
+	$(NVCC) $(NVCC_FLAGS) $< -o $@ $(LDLIBS)
+
+# ------------------------------------------------------------------------------
+# Method of Manufactured Solutions (MMS) Verification Binaries
+# ------------------------------------------------------------------------------
+
+# 4. MMS Sequential verification
+heat_mms_seq_3d: heat_mms_seq_3d.c heat_3d.h
+	$(CC) $(CFLAGS) $< -o $@ $(LDLIBS)
+
+# 5. MMS OpenMP parallel verification
+heat_mms_omp_3d: heat_mms_omp_3d.c heat_3d.h
+	$(CC) $(CFLAGS) $(OMP_FLAGS) $< -o $@ $(LDLIBS)
+
+# 6. MMS CUDA parallel verification
+heat_mms_cuda_3d: heat_mms_cuda_3d.cu heat_3d.h
+	$(NVCC) $(NVCC_FLAGS) $< -o $@ $(LDLIBS)
+
+# ------------------------------------------------------------------------------
+# One-shot reproduction
+# ------------------------------------------------------------------------------
+# Every number and every figure in the report must come out of this target.
+# Regenerating a figure by hand is what let stale plots drift away from the
+# data they were supposed to show.
+results: all
+	python3 test_mms.py
+	python3 benchmark_sweep.py
+	python3 plot_results.py --plot all
+
+# ------------------------------------------------------------------------------
+# Clean
+# ------------------------------------------------------------------------------
+clean:
+	rm -f $(TARGETS_ALL) *.o *.csv
+
+.PHONY: all cpu cuda clean results	# actions
