@@ -95,13 +95,12 @@ def show(label, r):
     print(f"{label:<24} {r['Time_s']:>8.4f} +/- {r['Time_std_s']:<7.4f} "
           f"(min {r['Time_min_s']:>7.4f})  "
           f"S_seq={r['Speedup']:>6.2f}x  S_omp1={r['Speedup_vs_omp1']:>6.2f}x  "
-          f"{r['GFLOPS']:>6.2f} GF  BW {r['Bandwidth_GBs']:>5.2f} GB/s")
+          f"{r['GLUPS']:>6.4f} GLUPS  {r['GFLOPS']:>6.2f} GF  BW {r['Bandwidth_GBs']:>5.2f} GB/s")
 
 
 def run_sweep(n=128, steps=100, repeats=3):
     print(f"\n--- Parameter Sweep (N={n}^3, {steps} steps, {repeats} repeats) ---")
-    print("Bandwidth is reported as a [perfect-reuse, no-reuse] bound, identically")
-    print("for every backend. The true DRAM traffic needs a profiler to settle.\n")
+    print("Effective memory bandwidth is reported based on compulsory memory traffic.\n")
 
     has_cuda = os.path.exists(os.path.join(SRC_DIR, "heat_cube_cuda_3d"))
     records = []
