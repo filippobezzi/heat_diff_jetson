@@ -74,7 +74,7 @@ GFLOPS uses 24 FLOP/cell on CPU and 48 on GPU; bandwidth is the **compulsory**
 traffic (20 B/cell CPU, 12 B/cell GPU), so it is a per-backend utilisation
 figure and not a cross-backend comparison. Use GLUPS or wall-clock time for that.
 
-| Backend | Threads / Block | Time (s) | Throughput | GFLOPS | $B_{\text{eff}}$ | % of 25.6 GB/s | Speedup vs Seq |
+| Backend | Threads / Block | Time (s) | Throughput | GFLOPS | BW_eff | % of 25.6 GB/s | Speedup vs Seq |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | **Sequential CPU** | 1 thread, untiled | 9.5845 ± 0.1000 | 0.02187 GLUPS | 0.525 | 0.438 GB/s | 1.71 % | **1.000×** |
 | **OpenMP CPU** | 1 thread, tiled | 9.2017 ± 0.1490 | 0.02280 GLUPS | 0.547 | 0.456 GB/s | 1.78 % | **1.042×** |
