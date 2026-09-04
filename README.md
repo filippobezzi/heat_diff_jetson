@@ -27,7 +27,9 @@ $$\alpha_{i+1/2, j, k} = \frac{2 \alpha_{i, j, k} \alpha_{i+1, j, k}}{\alpha_{i,
 
 The explicit FTCS update is bounded by the 3D von Neumann numerical stability limit:
 
-$$\Delta t \le \frac{\Delta x^2}{6 \cdot \max(\alpha)}$$
+$$\Delta t \le \frac{\Delta x^2}{6 \cdot \max(\alpha)}, \qquad \Delta t = 0.80\,\frac{\Delta x^2}{6\,\alpha_{\text{Cu}}}, \quad \Delta x = \frac{L}{N}$$
+
+Since $\Delta t \propto N^{-2}$, the number of steps to a fixed physical time scales as $N^2$ and total work as $\mathcal{O}(N^5)$.
 
 ---
 
@@ -53,7 +55,9 @@ $$\Delta t \le \frac{\Delta x^2}{6 \cdot \max(\alpha)}$$
 
 Code verification is performed using the **Method of Manufactured Solutions (MMS)** on a 3D trigonometric test field:
 
-$$u_{\text{exact}}(x,y,z,t) = e^{-3\pi^2 t} \sin(\pi x)\sin(\pi y)\sin(\pi z)$$
+$$u_{\text{exact}}(x,y,z,t) = \sin\!\left(\frac{\pi x}{L}\right)\sin\!\left(\frac{\pi y}{L}\right)\sin\!\left(\frac{\pi z}{L}\right)\exp\!\left(-\frac{3\alpha\pi^2 t}{L^2}\right)$$
+
+run with $L = 1$, uniform $\alpha = 0.143$, Dirichlet $u = 0$ on all faces, and $h = L/(N+1)$.
 
 Grid convergence tests across grid resolutions $N \in \{16, 32, 64, 128\}$ confirm second-order spatial accuracy ($\mathcal{O}(h^2)$) and machine-precision equivalence between CPU and GPU backends.
 
@@ -63,13 +67,59 @@ Grid convergence tests across grid resolutions $N \in \{16, 32, 64, 128\}$ confi
 
 * **Platform:** NVIDIA Jetson Nano Developer Kit (4× ARM Cortex-A57 @ 1.43 GHz, 128-core Maxwell GPU @ 921 MHz, 4 GB unified LPDDR4 @ 25.6 GB/s).
 
-### Grid Scaling & Throughput Summary
+### Throughput Summary — $N = 128^3$, 100 steps, 3 repeats (mean ± σ)
 
-| Backend | Threads / Block | Time ($N=128^3$) | Throughput | GFLOPS | Compulsory Bandwidth | Speedup vs Seq |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Sequential CPU** | 1 thread | 0.428 s | 0.489 GLUPS | 11.75 GFLOPS | 9.79 GB/s | **1.00×** |
-| **OpenMP CPU** | 4 threads | 0.123 s | 1.705 GLUPS | 40.92 GFLOPS | 34.10 GB/s (cached) | **3.48×** |
-| **CUDA GPU** | 256 th/block | 0.024 s | 8.738 GLUPS | 419.42 GFLOPS | 104.85 GB/s (cached) | **17.83×** |
+Source of record: [`data/benchmarks_reduced.csv`](data/benchmarks_reduced.csv).
+GFLOPS uses 24 FLOP/cell on CPU and 48 on GPU; bandwidth is the **compulsory**
+traffic (20 B/cell CPU, 12 B/cell GPU), so it is a per-backend utilisation
+figure and not a cross-backend comparison. Use GLUPS or wall-clock time for that.
+
+| Backend | Threads / Block | Time (s) | Throughput | GFLOPS | $B_{\text{eff}}$ | % of 25.6 GB/s | Speedup vs Seq |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Sequential CPU** | 1 thread, untiled | 9.5845 ± 0.1000 | 0.02187 GLUPS | 0.525 | 0.438 GB/s | 1.71 % | **1.000×** |
+| **OpenMP CPU** | 1 thread, tiled | 9.2017 ± 0.1490 | 0.02280 GLUPS | 0.547 | 0.456 GB/s | 1.78 % | **1.042×** |
+| **OpenMP CPU** | 2 threads | 4.8533 ± 0.1550 | 0.04323 GLUPS | 1.038 | 0.865 GB/s | 3.38 % | **1.975×** |
+| **OpenMP CPU** | 4 threads | 2.9722 ± 0.0089 | 0.07053 GLUPS | 1.693 | 1.411 GB/s | 5.51 % | **3.225×** |
+| **OpenMP CPU** | 8 threads | 2.9610 ± 0.0202 | 0.07083 GLUPS | 1.700 | 1.417 GB/s | 5.53 % | **3.237×** |
+| **OpenMP CPU** | 16 threads | 3.0011 ± 0.0837 | 0.06990 GLUPS | 1.678 | 1.398 GB/s | 5.46 % | **3.194×** |
+| **CUDA GPU** | 64 th/block (32×2) | 1.0971 ± 0.0289 | 0.19123 GLUPS | 9.180 | 2.295 GB/s | 8.97 % | **8.737×** |
+| **CUDA GPU** | 128 th/block (32×4) | 0.9889 ± 0.0017 | 0.21210 GLUPS | 10.180 | 2.545 GB/s | 9.94 % | **9.692×** |
+| **CUDA GPU** | **256 th/block (32×8)** | **0.9502 ± 0.0003** | **0.22073 GLUPS** | **10.594** | **2.649 GB/s** | **10.35 %** | **10.087×** |
+| **CUDA GPU** | 512 th/block (32×16) | 0.9622 ± 0.0004 | 0.21793 GLUPS | 10.461 | 2.615 GB/s | 10.22 % | **9.961×** |
+| **CUDA GPU** | 1024 th/block (32×32) | 1.0502 ± 0.0003 | 0.19973 GLUPS | 9.586 | 2.396 GB/s | 9.36 % | **9.127×** |
+
+Optimal CUDA block size is **256** (tile 32×8); the spread across the block sweep is 15.5 %.
+
+### Large-Grid Scaling — $N = 384^3$ (56.6 M cells, 27× the cells)
+
+Source of record: [`data/benchmarks_large.csv`](data/benchmarks_large.csv).
+
+| Backend | Threads / Block | Time (s) | Throughput | Speedup vs Seq |
+| :--- | :--- | ---: | ---: | ---: |
+| **Sequential CPU** | 1 thread, untiled | 313.264 ± 11.735 | 0.01810 GLUPS | **1.000×** |
+| **OpenMP CPU** | 8 threads | 63.712 ± 0.312 | 0.08887 GLUPS | **4.917×** |
+| **CUDA GPU** | 256 th/block | 25.868 ± 0.008 | 0.21887 GLUPS | **12.110×** |
+
+CUDA throughput is flat to **0.85 %** (0.22073 → 0.21887 GLUPS) across the 27×
+increase in cell count: the 2.5D scheme's reuse is block-local and therefore
+size-independent. Note that the sequential $N = 384$ point is the noisiest in
+the dataset (σ = 3.7 %), so the rising *speedup ratios* reflect the serial
+baseline degrading as much as the parallel codes improving.
+
+### Profiled Kernel Traffic (`nvprof`, block 256)
+
+| Metric | Value |
+| :--- | ---: |
+| `gld_throughput` / `gst_throughput` | 2.838 / 0.903 GB/s |
+| Measured DRAM traffic | 16.57 B/cell (4.14 accesses/cell) |
+| Measured CGMA / arithmetic intensity | 11.59 FLOP/access / 2.897 FLOP/B |
+| `gld_efficiency` | 79.61 % |
+| `achieved_occupancy` (`--maxrregcount=32`) | 0.9852 |
+| `sysmem_read/write_throughput` | 0 (unified memory, no PCIe traffic) |
+
+Every derivation behind these tables — formulas, explicit arithmetic, roofline
+placement, tile working sets, the $\mathcal{O}(N^5)$ cost law — is written out in
+[`COMPUTATIONS.md`](COMPUTATIONS.md).
 
 ---
 
@@ -89,14 +139,15 @@ heat_diff_jetson/
 │   ├── heat_mms_cuda_3d.cu       # MMS validation (CUDA)
 │   ├── benchmark_sweep.py        # Automated benchmark harness
 │   ├── test_mms.py               # Spatial grid convergence runner
-│   ├── plot_results.py           # Publication-quality plotting suite (300 DPI)
-│   └── utils.md                  # Hardware details and profiling instructions
+│   └── plot_results.py           # Publication-quality plotting suite (300 DPI)
 │
-├── data/                         # CSV datasets
-│   ├── avg_u_evo_3d.csv          # 500s physical temperature evolution dataset
-│   ├── benchmarks_reduced.csv    # Benchmark timings for N=128^3
+├── data/                         # CSV datasets (source of record for every quoted number)
+│   ├── avg_u_evo_3d.csv          # 500 s physical temperature evolution (N=64, CUDA, 170,400 steps)
+│   ├── benchmarks_reduced.csv    # Benchmark timings for N=128^3 (5 thread counts, 5 block sizes)
 │   ├── benchmarks_large.csv      # Benchmark timings for N=384^3
-│   └── mms_convergence_3d.csv    # L2 error convergence data
+│   ├── mms_convergence_3d.csv    # L2 error and observed order vs grid spacing
+│   ├── mms_u_evo_3d.csv          # MMS field average vs analytic solution
+│   └── mms_{seq,omp,cuda}_n{16,32,64,128}.csv   # Per-backend, per-resolution MMS traces
 │
 ├── fig/                          # Publication figures
 │   ├── temperature_evolution.png # Temperature evolution over 500 seconds
@@ -107,6 +158,7 @@ heat_diff_jetson/
 │   ├── effective_bandwidth.png   # Measured memory bandwidth
 │   └── roofline_model.png        # Roofline operational points
 │
+├── COMPUTATIONS.md               # Reference sheet: every metric, formula and explicit calculation
 └── presentation_FINAL.md         # Final presentation slides
 ```
 

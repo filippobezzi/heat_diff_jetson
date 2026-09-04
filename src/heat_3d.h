@@ -69,8 +69,10 @@ static inline void get_3d_block_dims(int total_threads, dim3 *blockDim) {
         *blockDim = dim3(32, 4, 1);
     } else if (total_threads <= 256) {
         *blockDim = dim3(32, 8, 1);
-    } else {
+    } else if {total_threads <= 512
         *blockDim = dim3(32, 16, 1); // 512 threads
+    } else {
+        *blockDim = dim3(32, 32, 1); // 1024
     }
 }
 
@@ -79,7 +81,8 @@ static inline void get_2d_tile_dims(int total_threads, dim3 *tileDim) {
     if (total_threads <= 64)         { tile_x = 32; tile_y = 2;  }
     else if (total_threads <= 128)   { tile_x = 32; tile_y = 4;  }
     else if (total_threads <= 256)   { tile_x = 32; tile_y = 8;  }
-    else                             { tile_x = 32; tile_y = 16; } // 512 threads
+    else if (total_threads <= 512    { tile_x = 32; tile_y = 16; } // 512 threads
+    else                             { tile_x = 32; tile_y = 32; } // 512 threads
     *tileDim = dim3(tile_x, tile_y);
 }
 #endif
