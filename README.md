@@ -76,19 +76,19 @@ figure and not a cross-backend comparison. Use GLUPS or wall-clock time for that
 
 | Backend | Threads / Block | Time (s) | Throughput | GFLOPS | $B_{\text{eff}}$ | % of 25.6 GB/s | Speedup vs Seq |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Sequential CPU** | 1 thread, untiled | 9.5845 ± 0.1000 | 0.02187 GLUPS | 0.525 | 0.438 GB/s | 1.71 % | **1.000×** |
-| **OpenMP CPU** | 1 thread, tiled | 9.2017 ± 0.1490 | 0.02280 GLUPS | 0.547 | 0.456 GB/s | 1.78 % | **1.042×** |
-| **OpenMP CPU** | 2 threads | 4.8533 ± 0.1550 | 0.04323 GLUPS | 1.038 | 0.865 GB/s | 3.38 % | **1.975×** |
-| **OpenMP CPU** | 4 threads | 2.9722 ± 0.0089 | 0.07053 GLUPS | 1.693 | 1.411 GB/s | 5.51 % | **3.225×** |
-| **OpenMP CPU** | 8 threads | 2.9610 ± 0.0202 | 0.07083 GLUPS | 1.700 | 1.417 GB/s | 5.53 % | **3.237×** |
-| **OpenMP CPU** | 16 threads | 3.0011 ± 0.0837 | 0.06990 GLUPS | 1.678 | 1.398 GB/s | 5.46 % | **3.194×** |
-| **CUDA GPU** | 64 th/block (32×2) | 1.0971 ± 0.0289 | 0.19123 GLUPS | 9.180 | 2.295 GB/s | 8.97 % | **8.737×** |
-| **CUDA GPU** | 128 th/block (32×4) | 0.9889 ± 0.0017 | 0.21210 GLUPS | 10.180 | 2.545 GB/s | 9.94 % | **9.692×** |
-| **CUDA GPU** | **256 th/block (32×8)** | **0.9502 ± 0.0003** | **0.22073 GLUPS** | **10.594** | **2.649 GB/s** | **10.35 %** | **10.087×** |
-| **CUDA GPU** | 512 th/block (32×16) | 0.9622 ± 0.0004 | 0.21793 GLUPS | 10.461 | 2.615 GB/s | 10.22 % | **9.961×** |
-| **CUDA GPU** | 1024 th/block (32×32) | 1.0502 ± 0.0003 | 0.19973 GLUPS | 9.586 | 2.396 GB/s | 9.36 % | **9.127×** |
+| **Sequential CPU** | 1 thread, untiled | 9.9223 ± 0.2741 | 0.02113 GLUPS | 0.507 | 0.423 GB/s | 1.65 % | **1.000×** |
+| **OpenMP CPU** | 1 thread, tiled | 8.9536 ± 0.0596 | 0.02343 GLUPS | 0.562 | 0.468 GB/s | 1.83 % | **1.108×** |
+| **OpenMP CPU** | 2 threads | 4.8226 ± 0.0868 | 0.04350 GLUPS | 1.044 | 0.870 GB/s | 3.40 % | **2.057×** |
+| **OpenMP CPU** | 4 threads | 2.9353 ± 0.0168 | 0.07147 GLUPS | 1.715 | 1.429 GB/s | 5.58 % | **3.380×** |
+| **OpenMP CPU** | **8 threads** | **2.8356 ± 0.0638** | **0.07397 GLUPS** | **1.776** | **1.480 GB/s** | **5.78 %** | **3.499×** |
+| **OpenMP CPU** | 16 threads | 2.9119 ± 0.0118 | 0.07200 GLUPS | 1.728 | 1.440 GB/s | 5.63 % | **3.408×** |
+| **CUDA GPU** | 64 th/block (32×2) | 1.0812 ± 0.0006 | 0.19393 GLUPS | 9.310 | 2.328 GB/s | 9.09 % | **9.177×** |
+| **CUDA GPU** | 128 th/block (32×4) | 0.9904 ± 0.0006 | 0.21173 GLUPS | 10.164 | 2.541 GB/s | 9.93 % | **10.018×** |
+| **CUDA GPU** | **256 th/block (32×8)** | **0.9501 ± 0.0004** | **0.22070 GLUPS** | **10.595** | **2.649 GB/s** | **10.35 %** | **10.443×** |
+| **CUDA GPU** | 512 th/block (32×16) | 0.9629 ± 0.0004 | 0.21777 GLUPS | 10.454 | 2.614 GB/s | 10.21 % | **10.304×** |
+| **CUDA GPU** | 1024 th/block (32×32) | 1.0506 ± 0.0003 | 0.19963 GLUPS | 9.582 | 2.395 GB/s | 9.36 % | **9.444×** |
 
-Optimal CUDA block size is **256** (tile 32×8); the spread across the block sweep is 15.5 %.
+Optimal CUDA block size is **256** (tile 32×8); the spread across the block sweep is 13.8 %.
 
 ### Large-Grid Scaling — $N = 384^3$ (56.6 M cells, 27× the cells)
 
@@ -96,15 +96,17 @@ Source of record: [`data/benchmarks_large.csv`](data/benchmarks_large.csv).
 
 | Backend | Threads / Block | Time (s) | Throughput | Speedup vs Seq |
 | :--- | :--- | ---: | ---: | ---: |
-| **Sequential CPU** | 1 thread, untiled | 313.264 ± 11.735 | 0.01810 GLUPS | **1.000×** |
-| **OpenMP CPU** | 8 threads | 63.712 ± 0.312 | 0.08887 GLUPS | **4.917×** |
-| **CUDA GPU** | 256 th/block | 25.868 ± 0.008 | 0.21887 GLUPS | **12.110×** |
+| **Sequential CPU** | 1 thread, untiled | 290.022 ± 0.405 | 0.01950 GLUPS | **1.000×** |
+| **OpenMP CPU** | 8 threads | 77.751 ± 0.108 | 0.07280 GLUPS | **3.730×** |
+| **CUDA GPU** | 256 th/block | 25.878 ± 0.004 | 0.21880 GLUPS | **11.207×** |
 
-CUDA throughput is flat to **0.85 %** (0.22073 → 0.21887 GLUPS) across the 27×
+CUDA throughput is flat to **0.86 %** (0.22070 → 0.21880 GLUPS) across the 27×
 increase in cell count: the 2.5D scheme's reuse is block-local and therefore
-size-independent. Note that the sequential $N = 384$ point is the noisiest in
-the dataset (σ = 3.7 %), so the rising *speedup ratios* reflect the serial
-baseline degrading as much as the parallel codes improving.
+size-independent. The *speedup ratios* rise (OpenMP 3.499× → 3.730×, CUDA
+10.443× → 11.207×) because the denominator moves: every backend loses
+throughput at 56.6 M cells, but the untiled sequential loop loses 7.73 %
+against CUDA's 0.86 %. Quote the GLUPS column, not the ratio, for claims about
+the parallel codes themselves.
 
 ### Profiled Kernel Traffic (`nvprof`, block 256)
 

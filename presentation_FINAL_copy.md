@@ -12,12 +12,6 @@
 
 <br>
 
-A complete workflow, from a plain sequential CPU implementation to a
-GPU-targeted one, for a problem whose cost I could estimate in advance.
-
--> The aim was not to show that the GPU wins, but to find out <-
--> which resource actually sets the limit, and to check it. <-
-
 --------------------------------------------------------------------------------
 
 # 1. Outline
@@ -34,7 +28,7 @@ GPU-targeted one, for a problem whose cost I could estimate in advance.
 <br>
 
 ```
-   Sequential C  ->  OpenMP directives  ->  CUDA (coalesced -> tiled)
+   Sequential C  ->  OpenMP directives  ->  CUDA
 ```
 
 Set-up and methods first; every measured number appears in section 6.
@@ -521,23 +515,23 @@ Relevance: Boring.
 ```
    Tile = 64 x 16 x 16 = 16,384 cells.  Per tile the loop touches:
 
-   u        read, with 1-cell halo : 66 x 18 x 18  =  83.5 KB
-   alpha_x  read (idx and i-1)     : 65 x 17 x 17  =  73.4 KB
-   alpha_y  read (idx and j-1)     :                  73.4 KB
-   alpha_z  read (idx and k-1)     :                  73.4 KB
-   u_next   written                : 64 x 16 x 16  =  64.0 KB
-                                                     ----------
-   WORKING SET PER TILE                              ~ 368 KB
+   u        read, with 1-cell halo : 66 x 18 x 18  =  83.53 KiB
+   alpha_x  read (idx and i-1)     : 65 x 16 x 16  =  65.00 KiB
+   alpha_y  read (idx and j-1)     : 64 x 17 x 16  =  68.00 KiB
+   alpha_z  read (idx and k-1)     : 64 x 16 x 17  =  68.00 KiB
+   u_next   written                : 64 x 16 x 16  =  64.00 KiB
+                                                     -----------
+   WORKING SET PER TILE               356,896 B    = 348.53 KiB
 ```
 
-* **1 thread:**  368 KiB, comfortably inside the 2 MiB shared L2.
-* **4 threads:** 4 x 368 KB = **1.44 MB < 2 MB**. Still fits, at 72 %
-  of the cache.
-* **8 threads:** 8 x 368 KB = **2.87 MB > 2 MB**. The eight tiles
+* **1 thread:**  348.5 KiB, 17 % of the 2 MiB shared L2.
+* **4 threads:** 4 x 348.5 KiB = **1.36 MiB < 2 MiB**. Still fits, at
+  68 % of the cache.
+* **8 threads:** 8 x 348.5 KiB = **2.72 MiB > 2 MiB**. The eight tiles
   begin to evict one another - but there are only 4 physical cores, so
   n = 8 is oversubscription anyway and the two effects are confounded.
 
-* A `64 x 32 x 16` tile weighs 713 KB, so four of them (**2.79 MB**)
+* A `64 x 32 x 16` tile weighs 683.8 KiB, so four of them (**2.67 MiB**)
   do not fit.
 
 
@@ -615,7 +609,7 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
 
 * **SMP Shared Memory vs. Block Allocation:**
   * Hardware Budget: 64 KB total SRAM per SM.
-  * Block allocation: 1.06 to 4.78 KB per block for its 2D XY slice.
+  * Block allocation: 1.06 to 9.03 KB per block for its 2D XY slice.
 
 ```
  #threads  XY      smem       total halo      resident blocks
@@ -641,7 +635,7 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
      -maxrregcount=32 : 32 registers, 0 bytes spill stores / loads
              
             (total # reg)
-   64 regs th -> 65536/64 = 1024 resident threads ->  50 %  (measured 0.4998)
+   64 regs th -> 65536/64 = 1024 resident threads ->  50 %  (measured 0.4997)
    32 regs th -> 65536/32 = 2048 resident threads -> 100 %  (measured 0.9852)
 
 ```
@@ -743,17 +737,17 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
 ```
    Backend / config          Time (s)            GLUPS   GFLOPS  BW GB/s
   ------------------------  -----------------   ------  -------  -------
-   Sequential (untiled)      9.9223 +/- 0.2741  0.0211    0.507   0.423
-   OpenMP   1 thread         8.9536 +/- 0.0596  0.0234    0.562   0.468
-   OpenMP   2 threads        4.8226 +/- 0.0868  0.0435    1.044   0.870
-   OpenMP   4 threads        2.9353 +/- 0.0168  0.0715    1.715   1.429
-   OpenMP   8 threads        2.8356 +/- 0.0638  0.0740    1.776   1.480  <-
-   OpenMP  16 threads        2.9119 +/- 0.0118  0.0720    1.728   1.440
-   CUDA  block   64          1.0812 +/- 0.0006  0.1939    9.310   2.328
-   CUDA  block  128          0.9904 +/- 0.0006  0.2117   10.164   2.541
-   CUDA  block  256          0.9501 +/- 0.0004  0.2207   10.595   2.649  <-
-   CUDA  block  512          0.9629 +/- 0.0004  0.2178   10.454   2.613
-   CUDA  block 1024          1.0506 +/- 0.0003  0.1996    9.582   2.395
+   Sequential (untiled)      9.9223 +/- 0.2741  0.02113   0.507   0.423
+   OpenMP   1 thread         8.9536 +/- 0.0596  0.02343   0.562   0.468
+   OpenMP   2 threads        4.8226 +/- 0.0868  0.04350   1.044   0.870
+   OpenMP   4 threads        2.9353 +/- 0.0168  0.07147   1.715   1.429
+   OpenMP   8 threads        2.8356 +/- 0.0638  0.07397   1.776   1.480  <-
+   OpenMP  16 threads        2.9119 +/- 0.0118  0.07200   1.728   1.440
+   CUDA  block   64          1.0812 +/- 0.0006  0.19393   9.310   2.327
+   CUDA  block  128          0.9904 +/- 0.0006  0.21173  10.164   2.541
+   CUDA  block  256          0.9501 +/- 0.0004  0.22070  10.594   2.648  <-
+   CUDA  block  512          0.9629 +/- 0.0004  0.21777  10.454   2.613
+   CUDA  block 1024          1.0506 +/- 0.0003  0.19963   9.582   2.396
 
    GFLOPS uses 24 FLOP/cell on CPU, 48 on GPU; BW uses the compulsory
    traffic, 20 B/cell on CPU and 12 B/cell on GPU.
@@ -761,13 +755,13 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
 
 * **GLUPS** are used to compare across backends.
 
-* **OpenMP** improves to n = 4 and then flattens: 2.9353 s against
-  2.8356 s at n = 8 and 2.9119 s at n = 16, a 1.5-sigma band around
-  of the n = 4 point. Beyond four threads nothing changes, which is
-  what four physical cores with one hardware thread each should give.
+* **OpenMP** improves to n = 4 and then flattens: 2.9353 s at n = 4,
+  2.8356 s at n = 8, 2.9119 s at n = 16 - a 3.4 % band, and the n=4 /
+  n=8 gap is only 1.5 sigma. Beyond four threads nothing changes, which
+  is what four physical cores with one hardware thread each should give.
 
 * **CUDA peaks at block 256** (tile 32 x 8), 0.9501 s, and the spread
-  across the sweep is **12 %**. 
+  across the sweep is **10.6 %**. 
   Two effects:
   * below 256 the Y-halo dominates - block 64 pays `2 x 1.06` extra
     reads per cell against `2 x 0.31` at block 256;
@@ -789,12 +783,13 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
 ```
     n =  1 :  1.00x              n =  2 :  1.86x   (E = 0.93)
     n =  4 :  3.05x  (E = 0.76)  n =  8 :  3.16x   (E = 0.39)
-    n = 16 :  3.07x  (E = 0.19)
+    n = 16 :  3.08x  (E = 0.19)
 ```
 
-  The two contributions separate: tiling alone gives 1.11x
-  (9.92 s -> 8.95 s at one thread) and worksharing gives the remaining
-  3.16x, for **3.50x** over the sequential baseline.
+  The two contributions separate: tiling alone gives 1.108x (or more
+  given the overhead due to calling of OpenMP methods) 
+  Worksharing clearly gives remaining advantage:
+  3.158x over 1 thread, **3.499x** over the sequential baseline.
 
 * **Right - CUDA against the bandwidth-implied ceiling:**
 
@@ -807,52 +802,6 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
 
 --------------------------------------------------------------------------------
 
-# 26. Does Amdahl's Law Explain That Departure?
-
-* The run is a **fixed problem size with increasing thread count**, so
-  this is strong scaling and Amdahl's law is the model to test:
-
-```
-      S(n) = 1 / ( (1 - p) + p/n )          E(n) = S(n) / n
-```
-
-* Fitting the parallel fraction `p` independently at each thread count,
-  from the left panel of the previous figure:
-
-```
-    n     S(n)     E(n)      p implied by S(n)
-   ---   ------   ------    -------------------
-    2     1.86     0.93           0.923
-    4     3.05     0.76           0.896
-    8     3.16     0.39           0.781
-   16     3.07     0.19           0.720
-```
-
-* **A single `p` does not describe the data.** With p = 0.923 fitted at
-  n = 2, Amdahl predicts S(4) = 3.25, S(8) = 5.19, S(16) = 7.41; I
-  measure 3.05, 3.16, 3.07. The curve falls off faster than any serial
-  fraction allows, and the fitted `p` drifts monotonically downward -
-  the signature of a model that does not fit rather than of a large
-  serial section.
-
-* So the limiting factor is not the serial fraction. Two candidates,
-  and the data separates them:
-
-  * **n >= 8 is simply saturation, not damage** - identical performance
-    to n = 4, which is what four physical cores with one hardware thread
-    each should give. Nothing is lost, nothing is gained.
-  * **n = 4 is where the real ceiling sits.** The tile-weight slide made
-    a falsifiable prediction here: shrinking the tile from `64x32x16`
-    (2.79 MiB at four threads) to `64x16x16` (1.44 MiB) should lift the
-    P = 4 speedup if L2 capacity was the cause. It did **not** - 3.05x
-    against 2.98x before, inside the scatter. **The L2 hypothesis is
-    refuted**, and the bandwidth slide says what replaces it.
-
-Relevance: this is the useful part of a scaling study - locating where
-you leave the ideal curve, and then being obliged to explain why.
-
---------------------------------------------------------------------------------
-
 # [FIGURE: fig/speedup_grid_sizes.png]
 
 -> ## Does the speedup survive at N = 384^3 (1.36 GB)? <-
@@ -861,75 +810,78 @@ you leave the ideal curve, and then being obliged to explain why.
    Backend            N = 128^3      N = 384^3      change
   ----------------   -----------    -----------    --------
    Sequential           1.00x          1.00x         ---
-   OpenMP  (8 th)       3.50x          3.73x        +6.6 %
-   CUDA (blk 256)      10.44x         11.21x        +7.3 %
+   OpenMP  (8 th)       3.50x          3.73x         +6.6 %
+   CUDA (blk 256)      10.44x         11.21x         +7.3 %
 ```
 
 ```
    Wall clock at N = 384^3, 100 steps (56.6 M cells):
-     Sequential    290.022 +/- 0.405 s
-     OpenMP 8 th    77.751 +/- 0.108 s
-     CUDA blk 256   25.878 +/- 0.004 s
+     Sequential    290.022 +/- 0.405 s      (sigma = 0.14 %)
+     OpenMP 8 th    77.751 +/- 0.108 s      (sigma = 0.14 %)
+     CUDA blk 256   25.878 +/- 0.004 s      (sigma = 0.02 %)
 
-   Throughput 128 -> 384:  Seq  0.0211 -> 0.0195 GLUPS   -7.7 %
-                           OMP8 0.0740 -> 0.0728 GLUPS   -1.6 %
-                           CUDA 0.2207 -> 0.2188 GLUPS   -0.9 %
+   Throughput, N = 128 -> N = 384:
+     Sequential    0.02113 -> 0.01950 GLUPS   -7.73 %
+     OMP 8 th      0.07397 -> 0.07280 GLUPS   -1.58 %
+     CUDA blk 256  0.22070 -> 0.21880 GLUPS   -0.86 %
 ```
 
 * **The speedups do not degrade with size - they improve slightly.**
-  Both parallel backends gain about 10 %, and the reason is the
-  denominator: the sequential baseline suffers more at 56.6 M cells
-  than the parallel codes do.
-* **CUDA throughput is flat to 0.8 %** across a **27x** increase in cell
-  count. That is the strong result. The 2.5D scheme reuses data *inside*
-  a block, in shared memory and registers, and that reuse does not care
-  how large the total working set is. Only the residual cross-block
-  reuse through the 256 KB L2 degrades, and it was never carrying much.
-* This is a change from the earlier kernel, which lost 25 % going to
+  The gain is in the denominator, not the numerator: every backend loses
+  throughput at 56.6 M cells, but the sequential baseline loses **9x
+  more** than CUDA (-7.7 % against -0.86 %). The untiled triple loop is
+  the only one whose reuse depends on the total working set.
+
+* **CUDA throughput is flat to 0.86 %** across a **27x** increase in cell
+  count. The 2.5D scheme reuses data *inside* a block, in shared memory and registers,
+  and that reuse does not care how large the total working set is.
+
+Relevance: a change from the naive kernel, which lost 25 % going to
   N = 384 because it read three `alpha` arrays from global memory and
   depended on L2 to catch them. Rebuilding the harmonic means from a
   single staged array removed that dependence.
-* Reproducibility at this size is excellent - sigma is 0.01 % on the GPU
-  and 0.24 % on the sequential run, on a board with pinned clocks.
 
 --------------------------------------------------------------------------------
 
 # 28. What the O(N^5) Law Costs in Practice
 
 * Now that the throughput is measured, the cost law from the set-up can
-  be evaluated. Using the best CUDA rate (0.2207 GLUPS) and r = 0.80:
+  be evaluated. Using the best CUDA rate (0.22070 GLUPS) and r = 0.80,
+  the prefactor is K = 3600 x (0.80 x 100^2 x 0.22070e9) / (6 x 111.0)
+  = 9.5439e12:
 
 ```
    T_phys,max  =  t_wall  x  ( r L^2 LUPS / 6 alpha )  x  N^-5
 
    N     dt (s)      physical seconds per HOUR of GPU wall clock
   ----  ----------  ---------------------------------------------
-    64   2.93e-03            8889 s          (2.5 h of physics)
-   128   7.33e-04             278 s
-   384   8.15e-05             1.13 s
+    64   2.933e-03           8888 s          (2.47 h of physics)
+   128   7.332e-04            277.8 s
+   384   8.146e-05              1.133 s     (at its own 0.21880 GLUPS)
 ```
 
 * The N^-5 law is directly visible: 64 -> 128 is a factor 2 in
-  resolution and a factor **32** in reachable physical time; 128 -> 384
-  is a factor 3 and a measured factor **245.1**.
+  resolution and a factor **32.0** in reachable physical time;
+  128 -> 384 is a factor 3 and a measured factor **245.1**, against
+  3^5 x (0.22070/0.21880) = **245.1** predicted.
 
 * **This is what fixes the evolution run.** To watch the cube actually
   cool I need several hundred seconds of physics, and:
 
 ```
-   500 s of physics costs      N = 64  :    202 s of GPU time
-                               N = 128 :    1.8 hours
-                               N = 384 :     18 days
+   500 s of physics costs      N = 64  :    202.5 s of GPU time
+                               N = 128 :    6480 s   (1.80 hours)
+                               N = 384 :    1.588e6 s (18.4 days)
+
+   tau_w = 1134 s costs        N = 64  :    459 s     (7.7 minutes)
+                               N = 128 :    14,698 s  (4.08 hours)
+                               N = 384 :    3.603e6 s (41.7 days)
 ```
 
 * So the field-evolution figure is run at **N = 64 for 500 s**, which
-  costs about three minutes. Reaching the 1134 s water relaxation time
-  at N = 384 would take roughly **42 days** of continuous GPU time.
-
-Relevance: the grid and duration of the physics run were chosen by this
-calculation, not by trial. It is also the clearest limiting factor in
-the project - the scheme, not the hardware, is what puts a converged
-384^3 run out of reach.
+  costs about three and a half minutes. Reaching the 1134 s water
+  relaxation time at N = 384 would take **41.7 days** of continuous
+  GPU time.
 
 --------------------------------------------------------------------------------
 
@@ -937,7 +889,7 @@ the project - the scheme, not the hardware, is what puts a converged
 
 -> ## Verification 2: a conservation law <-
 
-Run at N = 64 for 500 s, as justified on the previous slide.
+Run at N = 64 for 500 s.
 
 * Cube average: 80.0 C -> 26.24 C over 500 s of simulated time.
 * Domain average: flat.
@@ -947,23 +899,11 @@ Run at N = 64 for 500 s, as justified on the previous slide.
    <u>_total (t = 499.7 s)  =  20.390408 C
    ---------------------------------------------
    drift = 0.0051 C = 2.5e-4 relative,
-   over 170,400 timesteps with zero-flux walls
+   over 170,400 timesteps
 ```
 
-* With insulated boundaries the domain mean is a **conserved quantity**,
-  so this is a test and not merely a plot. A 2.5e-4 drift over 1.7e5
-  FP32 updates is ~1.5e-9 per step: round-off, not scheme error.
-
-* **This is the test that validates the interface treatment**, and it is
-  the only one that does. MMS runs at uniform alpha, where a harmonic
-  mean of two equal values is trivially correct. Here the two materials
-  differ by 776x, and with an arithmetic mean - or with the
-  non-conservative `alpha * lap(u)` form - flux leaks at the copper face
-  and this line visibly slopes.
-
-* It also validates the **on-the-fly** harmonic means specifically, since
-  this run is the CUDA backend. The GPU rebuilds the face conductances
-  from raw `alpha` and still conserves energy to round-off.
+* With insulated boundaries the domain mean is a **conserved quantity**.
+  A 2.5e-4 drift over 1.7e5 FP32 updates is ~1.5e-9 per step: round-off error.
 
 * Physics sanity check: at t = 500 s the cube is still at 26 C, well
   above the 20.4 C equilibrium, consistent with the 1134 s water
@@ -975,9 +915,6 @@ Run at N = 64 for 500 s, as justified on the previous slide.
 
 -> ## Utilisation against the 25.6 GB/s spec <-
 
-Following the course definition, effective bandwidth is the **compulsory**
-traffic divided by time - each location counted once per timestep, so
-re-reads served by cache are by construction not traffic:
 
 ```
    BW_eff = GLUPS x B_compulsory      B_compulsory = 20 B/cell (CPU)
@@ -987,12 +924,12 @@ re-reads served by cache are by construction not traffic:
 ```
    Configuration      BW_eff (GB/s)     % of 25.6 GB/s spec
   ----------------   ---------------   ---------------------
-   Seq (1 th)             0.423                1.65 %
-   OMP (1 th)             0.464                1.81 %
-   OMP (2 th)             0.893                3.49 %
-   OMP (4 th)             1.419                5.54 %
-   OMP (8 th)             1.480                5.78 %
-   CUDA (blk 256)         2.649               10.35 %
+   Seq (1 th)             0.4227               1.65 %
+   OMP (1 th)             0.4685               1.83 %
+   OMP (2 th)             0.8699               3.40 %
+   OMP (4 th)             1.4289               5.58 %
+   OMP (8 th)             1.4797               5.78 %
+   CUDA (blk 256)         2.6484              10.35 %
 ```
 
 * Equivalently, as a rate of lattice updates against what the memory
@@ -1001,25 +938,19 @@ re-reads served by cache are by construction not traffic:
 ```
    GLUPS_max = 25.6 / B_compulsory    CPU 1.280   GPU 2.133  GLUPS
 
-   best OMP  0.0740 / 1.280 =  5.8 %
-   best CUDA 0.2207 / 2.133 = 10.3 %      <- same numbers, one unit
+   best OMP  0.07397 / 1.280 =  5.78 %
+   best CUDA 0.22070 / 2.133 = 10.35 %    <- same numbers, one unit
 ```
 
-* This is where my expectation broke. I had read the OpenMP plateau at
-  n = 4 as the cores saturating the memory controller - but four threads
-  move **1.43 GB/s, 5.6 % of spec**. That is not saturation, and the
-  L2 hypothesis from the tiling slide was refuted independently.
+* OpenMP n = 4: the cores do not saturate the memory.
 * The 25.6 GB/s figure is a **CPU + GPU aggregate**. What the A57
   cluster alone can sustain is much lower, and I never measured it.
-* **The missing experiment:** a STREAM triad on this board would give
-  the real CPU ceiling. Until then, "saturated" is an assumption I
-  cannot defend, and I would rather say so than assert it.
 
 --------------------------------------------------------------------------------
 
 # [FIGURE: fig/roofline_model.png]
 
--> ## Roofline: below the roof, not on it <-
+-> ## Roofline: well below the roof <-
 
 The roofline is CGMA plotted against bytes instead of accesses
 (`I = CGMA / 4 B`), which puts both ceilings on one axis.
@@ -1030,34 +961,29 @@ The roofline is CGMA plotted against bytes instead of accesses
 
      backend        I (FLOP/B)   roof = I x 25.6   measured   % of roof
     ------------   -----------  -----------------  ---------  ----------
-     Sequential     24/20 = 1.20     30.7 GFLOPS     0.520      1.7 %
-     OpenMP 8 th    24/20 = 1.20     30.7 GFLOPS     1.719      5.6 %
-     CUDA blk 256   48/12 = 4.00    102.4 GFLOPS    10.601     10.4 %
+     Sequential     24/20 = 1.20     30.7 GFLOPS     0.507      1.65 %
+     OpenMP 8 th    24/20 = 1.20     30.7 GFLOPS     1.776      5.78 %
+     CUDA blk 256   48/12 = 4.00    102.4 GFLOPS    10.594     10.35 %
 
    Profiler cross-check on the CUDA point:
-     I_measured = 48 / 16.57 B = 2.90 FLOP/B -> roof 74.1 GFLOPS -> 14.3 %
+     I_measured = 48 / 16.57 B = 2.90 FLOP/B -> roof 74.2 GFLOPS -> 14.3 %
 ```
 
-* **The CUDA point moved right, not just up.** Both CGMA routes - reuse
-  by tiling, and arithmetic instead of bytes - raised the compulsory
-  intensity from 1.20 to 4.00, so the kernel now sits a factor 2.3 below
-  the ridge point instead of a factor 7.7. Still memory-side, far less so.
+* **The CUDA point moved right.**
 * The "% of roof" column is numerically identical to the "% of peak
   bandwidth" column on the previous slide. That is not a coincidence:
   `GFLOPS/roof = (I x BW_eff)/(I x BW_peak) = BW_eff/BW_peak`. The two
   slides are one measurement seen in two units.
-* All three points sit **7x to 60x below their own memory roof**. Were
-  bandwidth the binding constraint they would lie *on* the sloped line.
-* So the roofline is useful here in the negative: it excludes the
-  compute ceiling *and* the bandwidth ceiling. What remains is latency
-  and, on the CPU, the four scalar cores themselves.
+* All three points sit **10x to 61x below their own memory roof**
+  (60.6x sequential, 17.3x OpenMP 8, 9.7x CUDA).
+
+Relevance: the roofline excludes the compute ceiling *and* the bandwidth ceiling.
 
 --------------------------------------------------------------------------------
 
 # 32. Closing the Bracket: Profiling the Kernel
 
-The course tools are `htop` and `jtop`; to get per-kernel numbers I used
-`nvprof`, which is a step beyond the lectures.
+To get per-kernel numbers I used `nvprof`:
 
 ```
    nvprof --metrics gld_throughput,gst_throughput,achieved_occupancy,
@@ -1074,114 +1000,18 @@ The course tools are `htop` and `jtop`; to get per-kernel numbers I used
    1 store = 4 B/cell   ->   loads = 12.57 B/cell
    total requested traffic = 16.57 B/cell = 4.14 accesses/cell
 
-   CGMA_measured = 48 / 4.14 = 11.6     (naive: 3.20)
+   CGMA_measured = 48 / 4.14 = 11.6
    gld_efficiency     = 79.61 %
    achieved_occupancy = 0.9852
 ```
 
 * **Cross-check against the design.** The model for a 32 x 8 tile is
-  `2 x (1 + 2/32 + 2/8) + 1 = 3.63` accesses/cell against **4.14
-  measured**, 14 % apart. Two contributions, both expected:
-  * the X-halo loads (`tx == 0`, `tx == 31`) put one active lane in a
-    32-byte sector - 12.5 % utilisation, and they are what pulls
-    `gld_efficiency` down to 79.6 % from a modelled 75 %;
-  * the L2 catches part of the halo that neighbouring blocks share, so
-    the truth sits between the shared-memory model (3.63) and the
-    no-L2-reuse bound (4.50). It does: 4.14.
-* Together the two optimisations take the kernel from **60 B/cell to
-  16.6 B/cell measured**, CGMA from 3.20 to 11.6, and the
-  memory-imposed ceiling from 20.5 to **74 GFLOPS**.
-* `achieved_occupancy = 0.985` - the register cap works, and shared
-  memory was never the constraint.
-* `sysmem_read/write_throughput = 0` confirms zero PCIe traffic, as
-  expected on unified memory.
-* The reduction kernel reaches 0.96 occupancy and 100 % load efficiency,
-  and runs 11 times against the stencil's 100. The final aggregation
-  kernel is a single-thread loop over the partials - 1.6 % occupancy,
-  12.5 % efficiency - but at 11 invocations it costs under 0.5 % of the
-  run. It would matter in a long evolution run, and I have left it as a
-  measured limitation rather than a hidden one.
-
-Relevance: replacing a modelled bracket with a measured number, then
-checking it against my own design estimate, is the part of this project
-I would keep if I had to throw the rest away.
+  `2 x (1 + 2/32 + 2/8) + 1 = 3.63` accesses/cell against 
+  **4.14 measured**, 14 % apart. 
 
 --------------------------------------------------------------------------------
 
-# 33. Summary of the Parameter Sweeps
-
-```
-+-------------------+------------------+-------------------------------------+
-| Dimension         | Range tested     | Observed trend                      |
-+-------------------+------------------+-------------------------------------+
-| Grid size N       | 128, 384         | CUDA 10.44x -> 11.21x; OMP 3.50x -> |
-|                   | (64 for physics) | 3.73x. GPU throughput flat to 0.9 % |
-|                   |                  | over a 27x cell count: block-local  |
-|                   |                  | reuse is size-independent.          |
-+-------------------+------------------+-------------------------------------+
-| OpenMP threads n  | 1, 2, 4, 8, 16   | E = 0.96, 0.77, 0.39, 0.19. Leaves  |
-|                   |                  | the ideal curve between n=2 and n=4 |
-|                   |                  | faster than any single serial       |
-|                   |                  | fraction allows. n>=8 saturates.    |
-+-------------------+------------------+-------------------------------------+
-| CUDA block size B | 64, 128, 256,    | Peak at 256 (32x8), 12 % spread.    |
-|                   | 512, 1024        | Below: Y-halo dominates. Above:     |
-|                   |                  | resident blocks 8 -> 4. 512 and     |
-|                   |                  | 1024 identical (tile clamped).      |
-+-------------------+------------------+-------------------------------------+
-| OMP tile Y        | 32 -> 16         | 4-thread working set 2.79 -> 1.44   |
-|                   |                  | MiB, inside L2. Speedup unchanged:  |
-|                   |                  | the L2 hypothesis is refuted.       |
-+-------------------+------------------+-------------------------------------+
-| Interface alpha   | precomputed vs   | on-the-fly on GPU: +1 read, +24     |
-|                   | on-the-fly       | FLOP, CGMA 1.71 -> 3.20 naive.      |
-+-------------------+------------------+-------------------------------------+
-| Precision         | FP32 throughout  | FP64 costs a factor 32 on sm_53.    |
-+-------------------+------------------+-------------------------------------+
-```
-
-Relevance: the shapes matter as much as the values. Block size became a
-real trade-off only once shared memory held two fields; before that it
-was flat, and a flat sweep is itself the finding that the dimension is
-not a limiting factor.
-
---------------------------------------------------------------------------------
-
--> # Limiting Factors: What I Found <-
-
-* **1. The physics wall is O(N^5), and it is absolute.**
-  One hour of GPU time buys 8889 s of simulated time at N = 64, 278 s at
-  N = 128, and 1.13 s at N = 384. The 128 -> 384 ratio is **245.1
-  measured against 245.1 predicted**. That law, not the hardware, fixed
-  the configuration of every run in this project.
-
-* **2. Correctness holds across all three backends.**
-  Observed order 2.08 -> 2.03 -> 2.00 on the manufactured solution, and
-  the domain mean conserved to 2.5e-4 over 170,400 steps across a 776x
-  material jump - the only test that covers the on-the-fly harmonic means.
-
-* **3. Both CGMA routes paid off.**
-  Reuse (2.5D tiling of two fields) and arithmetic-for-bytes (on-the-fly
-  harmonic means) together took the kernel from 60 to **16.6 B/cell
-  measured**, CGMA 3.20 -> 11.6, and **10.44x** over the sequential
-  baseline - rising to 11.21x at N = 384^3.
-
-* **4. Three hypotheses I held were wrong, and testing them is the point.**
-  * I expected the CPU to saturate the memory controller at n = 4. It
-    reaches 5.6 % of the bandwidth spec.
-  * I blamed L2 oversubscription for the OpenMP plateau. Shrinking the
-    tile from 2.79 to 1.44 MiB changed nothing - hypothesis refuted.
-  * I expected shared memory to limit GPU residency. It was the register
-    file, and `-maxrregcount=32` fixed it for free: **zero spills**,
-    occupancy 50 % -> 98.5 %.
-
-* **5. What I would do next:**
-  * STREAM triad, to replace the assumed 25.6 GB/s CPU ceiling with a
-    measured one - the largest remaining gap in the analysis.
-  * Price the six FP32 divisions: `-use_fast_math` or `__fdividef`,
-    since a `div.rn.f32` is 10-20 instructions, not the 1 FLOP counted.
-  * N = 512^3 on the GPU alone - now reachable at 1.61 GB, since the
-    kernel keeps three arrays instead of six.
+# 33. Summary
 
 <br>
 
