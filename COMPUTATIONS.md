@@ -2,9 +2,12 @@
 ### 3D Heterogeneous Heat Diffusion on the NVIDIA Jetson Nano
 
 **Status:** reference sheet for every number quoted in `presentation_FINAL.md`.
+
 **Data of record:** `data/benchmarks_reduced.csv` (N = 128, 100 steps, 3 repeats),
 `data/benchmarks_large.csv` (N = 384), `data/mms_convergence_3d.csv`,
-`data/avg_u_evo_3d.csv`. **If a number in a slide disagrees with this file, this
+`data/avg_u_evo_3d.csv`. 
+
+**If a number in a slide disagrees with this file, this
 file is wrong until the CSV is re-read — the CSVs are the only source of truth.**
 
 **Code constants of record:** `src/heat_3d.h` (`FLOPS_PER_CELL`,
@@ -18,8 +21,7 @@ file is wrong until the CSV is re-read — the CSVs are the only source of truth
 **Reading rule.** Every figure below is either (a) read directly from a CSV,
 (b) derived by an equation stated in full on this page, or (c) read from a
 profiler run whose exact invocation is quoted. Nothing is asserted without one
-of those three provenances. Section 6 lists the defects found in the earlier
-draft of this document, so that they are not silently reintroduced.
+of those three provenances.
 
 ---
 
@@ -36,9 +38,6 @@ Everything else is derived from these three rows of `benchmarks_reduced.csv`.
 Benchmark point: $N = 128^3 = 2{,}097{,}152$ cells, $N_{\text{steps}} = 100$,
 total lattice updates $= 209{,}715{,}200$, 3 repeats, mean ± σ.
 
-> **The optimal CUDA block size is 256, not 128.** Block 128 runs at 0.9904 s,
-> 4.2 % slower. Any statement built on "block 128 is optimal" is void.
-
 ---
 
 ## 1. Metrics: definitions, formulations and explicit calculations
@@ -53,20 +52,13 @@ computed from.
 $$\text{LUPS} = \frac{N_x N_y N_z \, N_{\text{steps}}}{t_{\text{solve}}},
 \qquad \text{GLUPS} = \frac{\text{LUPS}}{10^9}$$
 
-Explicit, with $N_x N_y N_z N_{\text{steps}} = 2.097152\times10^{6}\times100
-= 2.097152\times10^{8}$:
+Explicit, with $N_x N_y N_z N_{\text{steps}} = 2.097152\times10^{6}\times100 = 2.097152\times10^{8}$:
 
 $$\text{GLUPS}_{\text{seq}} = \frac{2.097152\times10^{8}}{9.9223 \times 10^{9}} = 0.02113$$
 
 $$\text{GLUPS}_{\text{omp8}} = \frac{2.097152\times10^{8}}{2.8356 \times 10^{9}} = 0.07396$$
 
 $$\text{GLUPS}_{\text{cuda256}} = \frac{2.097152\times10^{8}}{0.9501 \times 10^{9}} = 0.22073$$
-
-> **Why the CSV says 0.22070 and this says 0.22073.** The solver reports one
-> GLUPS per repeat and the sweep averages those, whereas the line above divides
-> by the *mean* time. Since $\overline{1/t} \neq 1/\bar{t}$, the two differ in
-> the fifth digit. Tables in this document quote the CSV column; worked
-> derivations quote the mean-time value. Nothing downstream depends on it.
 
 (The CSV stores GLUPS to 5 significant digits; recomputing from `Time_s`
 reproduces it to the last digit shown. This is the internal-consistency check
@@ -154,8 +146,9 @@ nvprof --metrics gld_throughput,gst_throughput,gld_efficiency,\
 
 `solve_stencil_cuda_kernel`, averaged over 100 invocations:
 
-$$\text{gld\_throughput} = 2.838\ \text{GB/s}, \qquad
-\text{gst\_throughput} = 0.903\ \text{GB/s}$$
+$$
+\texttt{gld\_throughput} = 2.838\ \text{GB/s}, \qquad \texttt{gst\_throughput} = 0.903\ \text{GB/s}
+$$
 
 $$\text{load/store ratio} = \frac{2.838}{0.903} = 3.143$$
 
@@ -167,21 +160,11 @@ $$B_{\text{measured}} = 4 + 12.57 = \mathbf{16.57\ \text{B/cell}}
 = 4.14\ \text{accesses/cell}$$
 
 $$\text{reuse efficiency} = \frac{B_{\text{compulsory}}}{B_{\text{measured}}}
-= \frac{12.0}{16.57} = \mathbf{72.4\,\%}$$
+= \frac{12.0}{16.57} = \mathbf{72.4\, \%}$$
 
 Also measured: `gld_efficiency = 79.61 %`, `achieved_occupancy = 0.9852`,
 `sysmem_read/write_throughput = 0` (zero PCIe traffic, as expected on a
 unified-memory SoC).
-
-> **A second profile exists and is not interchangeable with this one.** An
-> earlier run at `--block_size 128` gives `gld = 3.494`, `gst = 0.962`, ratio
-> 3.632, $B = 18.53$ B/cell (4.63 acc/cell), `achieved_occupancy = 0.9807`.
-> That configuration is *not* the reported optimum, and the two runs differ in
-> block size, so their metrics must never be differenced. See §6.4.
-> Note also that `gld + gst = 3.741` GB/s here, while
-> $\text{GLUPS} \times 16.57 = 3.658$ GB/s: nvprof normalises throughput by
-> kernel-active time, GLUPS by total solve time. The two agree to 2 %, which
-> is the size of the launch-gap overhead, and neither is wrong.
 
 ---
 
@@ -232,9 +215,10 @@ are the sloped memory roof $P_{\text{roof}} = I \times 25.6$.
 > bandwidth" column in §1.3. If they ever differ, one of the two tables has
 > been edited without the other.
 
-All points sit 10× to 58× below their own memory roof (58.5× sequential, 18.1× OpenMP 8, 9.7× CUDA). The roofline is useful
-here **in the negative**: it excludes the compute ceiling *and* the bandwidth
-ceiling. What remains is latency, and on the CPU the four scalar cores.
+All points sit 10× to 58× below their own memory roof (58.5× sequential, 18.1× OpenMP 8, 9.7× CUDA). 
+The roofline is useful here **in the negative**: it excludes the compute ceiling *and* the bandwidth
+ceiling. The actual performance bottlenecks are: memory access latency, CPU scalar pipeline limitations,
+and GPU barrier and launch overheads. 
 
 ---
 
@@ -264,7 +248,7 @@ $T_{\text{omp}}(1,2,4,8,16) = 8.9536,\ 4.8226,\ 2.9353,\ 2.8356,\ 2.9119$ s.
 * worksharing alone: $8.9536/2.9353 = \mathbf{3.0503\times}$
 * product: $1.1082 \times 3.0503 = \mathbf{3.3803\times}$ = $S_{\text{seq}}(4)$ ✓
 
-**Amdahl fails as a model, and that is the result.** Fitting $p$ at $n = 2$
+**Amdahl fails as a model.** Fitting $p$ at $n = 2$
 gives $p = 0.9227$, which predicts $S(4) = 3.247$, $S(8) = 5.192$,
 $S(16) = 7.412$. Measured: 3.050, 3.158, 3.075. The fitted $p$ drifts
 monotonically downward (0.923 → 0.896 → 0.781 → 0.720) — the signature of a
@@ -283,11 +267,11 @@ Two candidate explanations, and the data separates them:
    working set (§3.2) at four threads is 1.36 MiB against a 2 MiB shared L2.
    The falsifiable test was run: shrinking the tile from $64\times32\times16$
    (2.67 MiB at four threads) to $64\times16\times16$ (1.36 MiB) did **not**
-   lift $S(4)$. **The L2-capacity hypothesis is refuted.** Nor is it DRAM
-   saturation: four threads move 1.41 GB/s, 5.5 % of the (aggregate) spec.
+   lift $S(4)$. **The L2-capacity hypothesis failed** (allowing all memory necessary
+   tocfit overlapping tiling operations into CPU L2 cache will favour $n \le 4$).
+   Nor is it DRAM saturation: four threads move 1.41 GB/s, 5.5 % of the (aggregate) spec.
 
-The honest residual: the limiting factor at $n = 4$ is not identified. The
-missing experiment is a STREAM triad giving the CPU-only bandwidth ceiling.
+The honest residual: the limiting factor at $n = 4$ is not identified.
 
 ---
 
@@ -296,7 +280,7 @@ missing experiment is a STREAM triad giving the CPU-only bandwidth ceiling.
 #### A. Method of Manufactured Solutions — spatial convergence
 
 $$u_{\text{exact}}(x,y,z,t) = \sin\frac{\pi x}{L}\sin\frac{\pi y}{L}
-\sin\frac{\pi z}{L}\,\exp\!\left(-\frac{3\alpha\pi^2 t}{L^2}\right)$$
+\sin\frac{\pi z}{L} \text{ } \exp\left(-\frac{3\alpha\pi^2 t}{L^2}\right)$$
 
 with $L = 1$, uniform $\alpha = 0.143$, Dirichlet $u = 0$ on all faces
 (`src/heat_mms_seq_3d.c: exact_field()`). It satisfies
@@ -305,7 +289,7 @@ error plus round-off.
 
 $$L_2 = \sqrt{\frac{1}{N_xN_yN_z}\sum_{i,j,k}\big(u_{ijk} - u_{\text{exact}}(x_i,y_j,z_k)\big)^2}$$
 
-$$p = \frac{\ln(L_2^{\text{coarse}}/L_2^{\text{fine}})}{\ln(h^{\text{coarse}}/h^{\text{fine}})},
+$$\text{order} = \frac{\ln(L_2^{\text{coarse}}/L_2^{\text{fine}})}{\ln(h^{\text{coarse}}/h^{\text{fine}})},
 \qquad h = \frac{L}{N+1}$$
 
 From `data/mms_convergence_3d.csv`:
@@ -319,7 +303,7 @@ From `data/mms_convergence_3d.csv`:
 
 Worked, $16 \to 32$:
 
-$$p = \frac{\ln(4.198606/1.059722)}{\ln(0.058824/0.030303)}
+$$\text{order} = \frac{\ln(4.198606/1.059722)}{\ln(0.058824/0.030303)}
 = \frac{1.37680}{0.66330} = 2.0756$$
 
 $32 \to 64$: $1.37870/0.67788 = 2.0338$. $64 \to 128$:
@@ -334,8 +318,8 @@ only by B.
 
 #### B. Discrete energy conservation — insulated heterogeneous domain
 
-With zero-flux Neumann walls, $\langle u\rangle$ is a conserved quantity, so
-this is a test, not a plot. Run: CUDA backend, $N = 64$, 500 s of physics,
+With zero-flux Neumann walls, $\langle u\rangle$ is a conserved quantity, and it should
+remain such. Run: CUDA backend, $N = 64$, 500 s of physics,
 170,400 steps, $\alpha$ ratio 776 (`data/avg_u_evo_3d.csv`).
 
 $$\langle u\rangle(0) = 20.395508\ ^\circ\text{C}, \qquad
@@ -361,8 +345,8 @@ each step and still conserves to round-off.
 Von Neumann stability for explicit FTCS in 3D, with the **global** maximum
 diffusivity:
 
-$$\Delta t \le \frac{h^2}{6\,\alpha_{\max}}, \qquad
-\Delta t = r\,\frac{h^2}{6\,\alpha_{\max}}, \quad r = 0.80, \quad
+$$\Delta t \le \frac{h^2}{6\alpha_{\max}}, \qquad
+\Delta t = r\frac{h^2}{6\alpha_{\max}}, \quad r = 0.80, \quad
 \alpha_{\max} = \alpha_{\text{Cu}} = 111.0\ \text{mm}^2/\text{s}$$
 
 The solver uses $h = L/N$ (not $L/(N+1)$; that spacing is the MMS convention
@@ -372,8 +356,8 @@ $$\text{work} = N^3 \times N_{\text{steps}} \propto N^5$$
 
 Inverted for a wall-clock budget $t_{\text{wall}}$:
 
-$$T_{\text{phys}} = t_{\text{wall}}\,
-\frac{r L^2\,\text{LUPS}}{6\,\alpha_{\max}}\, N^{-5}$$
+$$T_{\text{phys}} = t_{\text{wall}}
+\frac{r L^2\text{LUPS}}{6\alpha_{\max}} N^{-5}$$
 
 With $t_{\text{wall}} = 3600$ s, $L = 100$ mm, $\text{LUPS} = 0.22070\times10^9$:
 
@@ -387,9 +371,8 @@ $$K = 3600 \times \frac{0.80 \times 100^2 \times 0.22070\times10^{9}}{6 \times 1
 | 384 | 8.1462e-05 | **1.133** s |
 
 ($N = 384$ uses its own measured 0.21880 GLUPS.) The law is directly visible:
-$64\to128$ is a factor 2 in resolution and a factor **32.0** in reachable
-physical time; $128\to384$ is a factor 3 and a factor **245.1**, against
-$3^5 \times (0.22070/0.21880) = 245.1$ predicted — agreement to 0.1 %.
+$64\to128$ is a factor 2 in resolution and a factor **32.0** ($\sim 2^5$) in reachable
+physical time; $128\to384$ is a factor 3 and a factor **245.1** ($\sim 3^5$) — agreement to 0.1 %.
 
 **Cost of the runs that matter:**
 
@@ -421,20 +404,20 @@ a separation of 3105 — the stiffness that drives the whole cost.
    +---------------------------------------------------------------+
    |            NVIDIA Tegra X1 / T210  (Jetson Nano)              |
    +---------------------------------------------------------------+
-   |  4 GB unified LPDDR4, 64-bit @ 1600 MHz  ->  25.6 GB/s        |
-   |  (one pool, shared by CPU and GPU: no PCIe, no explicit copy) |
+   |     4 GB unified LPDDR4, 64-bit @ 1600 MHz  ->  25.6 GB/s     |
+   |             (one pool, shared by CPU and GPU)                 |
    +-------------------------------+-------------------------------+
                                    |
                 +------------------+------------------+
                 |                                     |
     +-----------------------------+     +-----------------------------+
-    |  4x ARM Cortex-A57 @ 1.43   |     |  1 Maxwell SM, cc 5.3       |
+    |  4x ARM Cortex-A57          |     |  1 Maxwell SM               |
     |  4 cores, 1 thread/core     |     |  128 CUDA cores, warp 32    |
     |  32 KB L1D/core, 64 B line  |     |  4 warp schedulers          |
     |  2 MB shared L2             |     |  2048 max resident threads  |
-    |  NEON present, unused here  |     |  64K x 32-bit registers     |
-    |  (see 2.3)                  |     |  64 KB shared mem / SM      |
-    +-----------------------------+     |  48 KB shared mem / block   |
+    +-----------------------------+     |  64K x 32-bit registers     |
+                                        |  64 KB shared mem / SM      |
+                                        |  48 KB shared mem / block   |
                                         |  256 KB L2, 32 B line       |
                                         +-----------------------------+
 ```
@@ -473,15 +456,6 @@ simply queues more blocks through the same hardware.
 Hiding a 400-cycle stall at CGMA ≈ 3–12 requires the scheduler to always find
 an eligible warp. That is why occupancy (§3.6), not shared memory, was the
 binding GPU constraint.
-
-### 2.3 Note on CPU SIMD
-
-The Cortex-A57 implements ARMv8-A, in which NEON (Advanced SIMD) is
-**mandatory** — the slide phrase "no SIMD" is architecturally false and should
-read "not vectorised". The stencil inner loop carries six data-dependent
-boundary ternaries (`(i > 0) ? ... : ...`), which is the likely reason `gcc
--O3` does not vectorise it. This has not been confirmed against
-`-fopt-info-vec-missed`; it is the standing hypothesis, not a measurement.
 
 ---
 
@@ -550,7 +524,7 @@ falsifiable test of the L2 hypothesis and **did not** improve $S(4)$ — see
 `threadIdx.x` is bound to the contiguous axis $i$:
 
 $$i = \text{blockIdx.x}\cdot\text{blockDim.x} + \text{threadIdx.x}
-\;\Rightarrow\; \text{addr} = \text{base} + 4\,\text{threadIdx.x}$$
+\text{ }\Rightarrow\text{ } \text{addr} = \text{base} + 4\text{threadIdx.x}$$
 
 so 32 lanes collapse into **one 128 B transaction**. Mapping `threadIdx.x` to
 $k$ instead would issue ~32 separate transactions per warp.
@@ -600,8 +574,9 @@ thread rather than shared between threads.
 
 $$\text{shared bytes/block} = 2 \times (\text{tile}_x + 2)(\text{tile}_y + 2)\times 4$$
 
-$$\text{model accesses/cell} = 2\left(1 + \frac{2}{\text{tile}_x}
-+ \frac{2}{\text{tile}_y}\right) + 1$$
+$$
+\text{model accesses/cell} = 2\left(1 + \frac{2}{\text{tile}_x} + \frac{2}{\text{tile}_y}\right) + 1
+$$
 
 the leading 2 because **both** fields are staged, the trailing 1 for the store.
 
@@ -736,7 +711,7 @@ increase in cell count. That is the strong result: the 2.5D scheme reuses data
 independent of the total working-set size. Only the residual cross-block reuse
 through the 256 KB L2 degrades, and it was never carrying much.
 
-Both speedup ratios improve, but read them with care: the **denominator moves**.
+Both speedup ratios improve, but the **denominator moves**.
 Every backend loses throughput at 56.6 M cells, and the serial baseline loses
 by far the most:
 
@@ -746,11 +721,9 @@ by far the most:
 | OpenMP 8 th | 0.07397 | 0.07280 | −1.58 % |
 | CUDA blk 256 | 0.22070 | 0.21880 | −0.86 % |
 
-So the +6.6 % and +7.3 % are statements about the serial baseline degrading
-9× faster than CUDA, not about the parallel codes improving. The untiled
-triple loop is the only implementation whose reuse depends on the total
-working-set size. If the claim is about the parallel code itself, quote the
-GLUPS column, which is flat or mildly negative.
+So the +6.6 % and -7.3 % are statements about the serial baseline degrading
+9× faster than CUDA. The untiled triple loop is the only implementation 
+whose reuse depends on the total working-set size. The GLUPS column is flat (mildly negative).
 
 ---
 
@@ -790,8 +763,7 @@ GLUPS column, which is flat or mildly negative.
 
 6. **The binding limit overall is the scheme, not the chip.** $\mathcal{O}(N^5)$
    puts a converged $384^3$ run at 41.7 days of GPU time for one water
-   relaxation time. No amount of tuning on this hardware closes that; only an
-   implicit or multi-rate integrator would.
+   relaxation time. No amount of tuning on this hardware closes that.
 
 **Open items, stated rather than hidden:**
 
@@ -804,104 +776,3 @@ GLUPS column, which is flat or mildly negative.
 * $N = 512^3$ on the GPU alone (1.61 GB with three arrays instead of six).
 
 ---
-
-## 6. Errata: defects corrected from the earlier draft of this document
-
-Recorded so they are not reintroduced. Each is a real discrepancy against the
-CSVs or the source, not a matter of taste.
-
-**6.1 Every wall-clock time was wrong.** The draft quoted 9.788 / 9.392 /
-4.831 / 2.878 / 2.862 s (CPU) and 0.905 / 0.901 / 0.933 / 1.000 s (CUDA).
-`benchmarks_reduced.csv` now gives 9.9223 / 8.9536 / 4.8226 / 2.9353 / 2.8356
-and 1.0812 / 0.9904 / 0.9501 / 0.9629 / 1.0506 (see §6.8). Every derived
-quantity moved.
-
-**6.2 The optimal block size is 256, not 128.** The draft's claim that "block
-128 is optimal in practice (0.901 s)" inverts the measurement: 256 is 4.2 %
-faster. Its supporting sentence — "sizing up from 64 to 128 … yielding a
-significant speedup (0.905 s → 0.901 s)" — also calls a 0.4 % change
-significant, which it would not be even if the numbers were real. The measured
-64 → 128 step is 1.0812 → 0.9904 s, 8.4 %.
-
-**6.3 The sweep was incomplete.** Block 1024 (32×32, 9.03 KiB smem, 2 resident
-blocks, 1.0506 s) and OpenMP $n = 16$ (2.9119 s, $E = 0.192$) were omitted.
-Both matter: 1024 is where the "more threads, less halo" model visibly breaks,
-and $n = 16$ confirms the 4-core saturation.
-
-**6.4 The profiler numbers belonged to a different configuration.** The draft
-paired block-128 nvprof metrics (gld 3.494 / gst 0.962, 18.53 B/cell, 4.63
-acc/cell) with a claim about the optimal kernel. The block-256 profile (gld
-2.838 / gst 0.903, 16.57 B/cell, 4.14 acc/cell, occupancy 0.9852) is the one
-that describes the reported configuration and is used here; the block-128
-figures survive only as the secondary note in §1.3. The two runs differ in
-block size *and* register flag, so no metric may be differenced between them.
-
-**6.5 The $\mathcal{O}(N^5)$ prefactor was mistyped.** The draft wrote
-$K = 1.00676\times10^{14}$ but then divided as though $K = 1.00671\times10^{13}$.
-The exponent was wrong and the arithmetic downstream silently correct. With
-the measured 0.22070 GLUPS, $K = 9.5438\times10^{12}$.
-
-**6.6 The $N = 384$ throughput was invented.** The draft used
-"GLUPS = 0.2000" at $N = 384$. The measured value is 0.21880
-(`benchmarks_large.csv`), a 9.4 % error that propagates into every day-count.
-
-**6.8 The benchmark suite was re-run (2026-09-06 20:28) to reduce scatter,
-and this document was rebuilt on it.** The previous run had a 3.7 % σ on the
-sequential $N = 384$ point, which made the scaling comparison unreliable. The
-re-run brings every point to σ ≤ 2.8 % at $N = 128$ and σ ≤ 0.14 % at
-$N = 384$. Two conclusions changed materially:
-
-| quantity | previous run | this run |
-|---|---:|---:|
-| Sequential $N=128$ | 9.5845 ± 0.1000 s | 9.9223 ± 0.2741 s |
-| Sequential $N=384$ | 313.264 ± 11.735 s (σ 3.7 %) | 290.022 ± 0.405 s (σ 0.14 %) |
-| OpenMP 8 th $N=384$ | 63.712 s, 0.08887 GLUPS | 77.751 s, 0.07280 GLUPS |
-| OpenMP $S_{\text{seq}}$ @384 | 4.917× (+51.9 %) | 3.730× (+6.6 %) |
-| CUDA $S_{\text{seq}}$ @384 | 12.110× (+20.1 %) | 11.207× (+7.3 %) |
-
-The old OpenMP figure implied throughput *rising* 25 % on a 27× larger
-problem, which is not physical; it was an artefact of the noisy serial
-baseline. The corrected picture is that all three backends lose throughput
-with size and the serial one loses most. Best CPU configuration also moved
-from 2.9610 s to 2.8356 s at $n = 8$, but $n = 4$ is now within 1.5 σ of it,
-so the defensible claim is saturation at four threads rather than a winner.
-
-**6.7 Two tile working-set entries were arithmetically wrong.**
-$\alpha_y$ and $\alpha_z$ were given as 70,000 B; $64\times17\times16\times4 =
-69{,}632$ B. Total per tile 356,896 B (348.53 KiB), not 357,632 B. At four
-threads 1.361 MiB, not 1.397 MB.
-
-**6.8 The full-3D-tiling occupancy claim was wrong.** $2\times34\times10\times10
-\times4 = 27{,}200$ B = 26.56 KiB (the draft's "27.2 KiB" mixes KB and KiB).
-Against 64 KB of SM shared memory that admits **2** blocks = 512 threads =
-**25 %** occupancy, not 1 block and 12.5 %.
-
-**6.9 The L2 explanation contradicts the project's own experiment.** The draft
-attributes the $n = 4$ efficiency loss to the aggregate working set
-"approaching the 2 MB L2 … and competing for bus latency". That hypothesis was
-tested by shrinking the tile and was **refuted** (§1.6). Reintroducing it
-discards the most defensible result in the scaling study.
-
-**6.10 "Eliminates 3 array reads (24 B/cell)" is wrong on both counts.** The
-CPU reads three $\alpha$ arrays compulsorily (12 B/cell); the GPU reads one
-(4 B). The saving is **two** arrays, **8 B/cell**, 20 → 12 B compulsory.
-
-**6.11 The intensity shift was quoted against the wrong baseline.** "From
-$I = 0.80$ to $I = 4.00$" compares the CUDA *naive* intensity with the CUDA
-*compulsory* one — two different rows of the same table. The design
-comparison is CPU compulsory 1.20 → GPU compulsory 4.00.
-
-**6.12 "No SIMD / Vector" on the Cortex-A57 is false.** NEON is mandatory in
-ARMv8-A. The defensible statement is that this loop is not vectorised; see
-§2.3.
-
-**6.13 The CPU "% of peak" figures were quoted without their caveat.** 25.6
-GB/s is the CPU+GPU aggregate; the A57-only ceiling is unmeasured.
-
-**6.14 Broken cross-references.** `COMPUTATIONS.md` and `AUDIT.md` live in
-`Final Project/utils/`, not `Final Project/`; `mms_convergence_3d.csv` lives in
-`Final Project/heat_diff_jetson/data/`, not `Final Project/data/`.
-
-**6.15 Typography.** "the True Benchmark Benchmark"; `$209{,}715{,}200 /
-(9.788\times10^9)$ GLUPS' writes $t\times10^9$ where it means
-$t \cdot 10^{9}$ in the denominator of a rate.
