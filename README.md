@@ -38,12 +38,12 @@ Since $\Delta t \propto N^{-2}$, the number of steps to a fixed physical time sc
 | Implementation | Backend | Memory Access Strategy | Arithmetic Cost | Compulsory DRAM Traffic |
 | :--- | :--- | :--- | :--- | :--- |
 | **Sequential** | C (`gcc -O3`) | Precomputed face arrays ($\alpha_x, \alpha_y, \alpha_z$) | 24 FLOP/cell | 20 Bytes/cell |
-| **Multi-Threaded** | OpenMP (`-fopenmp`) | 3D pencil cache tiling ($64 \times 16 \times 16$) | 24 FLOP/cell | 20 Bytes/cell |
+| **Multi-Threaded** | OpenMP (`-fopenmp`) | 3D cache tiling ($64 \times 16 \times 16$) | 24 FLOP/cell | 20 Bytes/cell |
 | **GPU Accelerated**| CUDA (`nvcc -O3`) | 2.5D register sliding window + 2D shared memory halo | 48 FLOP/cell (on-the-fly) | 12 Bytes/cell |
 
 ### Key Optimizations:
 1. **Sequential Baseline (C):** Precomputes directional interface harmonic averages during initialization, converting 6 on-the-fly floating-point divisions per cell into 3 memory reads.
-2. **OpenMP CPU Solver:** Employs 3D cache pencil blocking (`OMP_TILE_X=64, OMP_TILE_Y=16, OMP_TILE_Z=16`) to retain working sets entirely within the Cortex-A57's 2 MB shared L2 cache, eliminating memory bus streaming stalls.
+2. **OpenMP CPU Solver:** Employs 3D cache blocking (`OMP_TILE_X=64, OMP_TILE_Y=16, OMP_TILE_Z=16`) to retain working sets entirely within the Cortex-A57's 2 MB shared L2 cache, eliminating memory bus streaming stalls.
 3. **CUDA GPU Solver:** Implements a 2.5D sliding-window stencil kernel:
    - Maintains $z$-axis neighbors ($u_{k-1}, u_k, u_{k+1}$) in on-chip GPU hardware registers.
    - Loads $x$- and $y$-halos into 2D shared memory (`__shared__`).
@@ -59,7 +59,7 @@ $$u_{\text{exact}}(x,y,z,t) = \sin\!\left(\frac{\pi x}{L}\right)\sin\!\left(\fra
 
 run with $L = 1$, uniform $\alpha = 0.143$, Dirichlet $u = 0$ on all faces, and $h = L/(N+1)$.
 
-Grid convergence tests across grid resolutions $N \in \{16, 32, 64, 128\}$ confirm second-order spatial accuracy ($\mathcal{O}(h^2)$) and machine-precision equivalence between CPU and GPU backends.
+Grid convergence tests across grid resolutions $N \in \{16, 32, 64, 128\}$ confirm second-order spatial accuracy ( $\mathcal{O}(h^2)$ ) and machine-precision equivalence between CPU and GPU backends.
 
 ---
 
