@@ -96,7 +96,7 @@ cost of this simulation. Everything that follows descends from that 776.
 
 --------------------------------------------------------------------------------
 
-# 4. The 3D 7-Point Stencil: Counting Operations and Accesses
+# 4. Face-Centering and The 3D 7-Point Stencil
 
 ```
                                  u[i,j,k-1]   (Up: k-1)
@@ -145,9 +145,9 @@ Relevance: this gives the insight that drove the implementation - a low
 
 # 5. Stability: the Copper Sets the Timestep for Every Cell
 
-* Von Neumann analysis (insert a Fourier mode `u ~ g^n exp(i k.x)` and
-  require `|g| <= 1`, so no mode can grow unstable) gives,
-  for explicit Forard-Time Central-Space discretization (FTCS) in 3D:
+* Von Neumann analysis (insert a Fourier mode `u^n ~ g^n exp(i k.x)` and
+  require the **amplification factor** `|g| = u^n+1 / u^n <= 1`, so no mode can grow
+  unstable) gives, for explicit Forard-Time Central-Space discretization (FTCS) in 3D:
 
 ```
       dt <= h^2 / ( 6 * alpha_max ) = h^2 / ( 6 * alpha_copper )
@@ -211,25 +211,25 @@ Relevance: this is a **stiff** problem, meaning there is a massive disparity
 # 7. The Platform: One Chip, One Memory Pool
 
 ```
-       +---------------------------------------------------------+
-       |        NVIDIA JETSON NANO SoC  (Tegra X1 / T210)        |
-       +----------------------------+----------------------------+
-                                    |
-       +----------------------------+----------------------------+
-       |      4 GB UNIFIED LPDDR4 DRAM  (shared CPU & GPU)       |
-       |        64-bit bus @ 1600 MHz  ->  peak 25.6 GB/s        |
-       +----------------------------+----------------------------+
-                                    |
-                    +---------------+---------------+
-                    |                               |
-         +--------------------+          +--------------------+
-         | 4x Cortex-A57 CPU  |          |   1 SMP, Maxwell   |
-         |  4 cores, no SIMD  |          |   128 CUDA cores   |
-         |   2 MB shared L2   |          |  compute cap. 5.3  |
-         |  32 KB L1D / core  |          |  256 KB L2 cache   |
-         |   (64 B line)      |          |   (32 B line)      |
-         +--------------------+          +--------------------+
-
+   +---------------------------------------------------------------+
+   |            NVIDIA Tegra X1 / T210  (Jetson Nano)              |
+   +---------------------------------------------------------------+
+   |     4 GB unified LPDDR4, 64-bit @ 1600 MHz  ->  25.6 GB/s     |
+   |             (one pool, shared by CPU and GPU)                 |
+   +-------------------------------+-------------------------------+
+                                   |
+                +------------------+------------------+
+                |                                     |
+    +-----------------------------+     +-----------------------------+
+    |  4x ARM Cortex-A57          |     |  1 Maxwell SM               |
+    |  4 cores, 1 thread/core     |     |  128 CUDA cores, warp 32    |
+    |  32 KB L1D/core, 64 B line  |     |  4 warp schedulers          |
+    |  2 MB shared L2             |     |  2048 max resident threads  |
+    +-----------------------------+     |  64K x 32-bit registers     |
+                                        |  64 KB shared mem / SM      |
+                                        |  48 KB shared mem / block   |
+                                        |  256 KB L2, 32 B line       |
+                                        +-----------------------------+
 ```
 
 Relevance: each hardware block motivates a specific implementation
@@ -237,7 +237,7 @@ Relevance: each hardware block motivates a specific implementation
   * 4 GB => hard upper ceiling on the maximum grid dimensions N^3;
   * Small CPU/GPU caches => explicit spatial cache blocking and 2.5D tiling;
   * 128 cores on 1 SMP => latency hidden via occupancy and coalescing;
-  * Unified 25.6 GB/s bus => the ultimate ceiling for both engines.
+  * Unified 25.6 GB/s bus => the ultimate ceiling.
 
 
 --------------------------------------------------------------------------------
@@ -261,15 +261,14 @@ Relevance: each hardware block motivates a specific implementation
       perfect reuse    CGMA = 24/ 5 = 4.80  ->  30.7 GFLOP/s  13.0 %
 ```
 
-* So even with a perfect cache the memory system caps the naive
-  formulation at **30.7 of 236 GFLOP/s - 13 % of the compute peak**.
+* So even with a perfect cache the memory system caps formulation at
+  **30.7 of 236 GFLOP/s - 13 % of the compute peak**.
 
-* **Machine balance:** `236 / 25.6 = 9.22 FLOP/Byte`, or 36.8 FLOP per
-  4-byte access (CGMA). Below that no kernel can be compute-limited. The
-  compulsory stencil sits at `24/20 = 1.20 FLOP/B`, a factor 7.7 below.
+* **Arithmetic Intensity (I = P / B):** `236 / 25.6 = 9.22 FLOP/Byte` (*Ridge Point*),
+  or 36.8 FLOP per 4-byte access (CGMA).
 
 * **FP64:** on Maxwell sm_53 the FP64 issue rate is 1/32 of FP32.
-  Everything is FP32; FP64 would have cost a factor 32 for no benefit.
+  Everything is FP32; FP64 would have cost a factor 32.
 
 Relevance: To raise the ceiling I must raise CGMA, and there are 
  two ways to do it - reuse data instead of re-reading it,
@@ -722,7 +721,7 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
 
 * **What this rules out:**
 
-  * wrong stencil coefficients - the slope would decrease;
+  * wrong stencil coefficients - the slope would change;
   * a race condition in the OpenMP version - the points would scatter
     between repeats;
   * broken halo logic in CUDA - the green points would drift at large
@@ -778,17 +777,17 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
 
 -> ## Speedup against the ideal linear curve <-
 
-* **Left - OpenMP against the ideal linear curve S(n) = n:**
+* **Left - OpenMP against the ideal linear curve S(P) = P:**
 
 ```
-    n =  1 :  1.00x              n =  2 :  1.86x   (E = 0.93)
-    n =  4 :  3.05x  (E = 0.76)  n =  8 :  3.16x   (E = 0.39)
-    n = 16 :  3.08x  (E = 0.19)
+    P =  1 :  1.00x              P =  2 :  1.86x   (E = 0.93)
+    P =  4 :  3.05x  (E = 0.76)  P =  8 :  3.16x   (E = 0.39)
+    P = 16 :  3.08x  (E = 0.19)
 ```
 
   The two contributions separate: tiling alone gives 1.108x (or more
   given the overhead due to calling of OpenMP methods) 
-  Worksharing clearly gives remaining advantage:
+  Worksharing clearly gives the remaining advantage:
   3.158x over 1 thread, **3.499x** over the sequential baseline.
 
 * **Right - CUDA against the bandwidth-implied ceiling:**
@@ -797,8 +796,7 @@ Spoiler: the 32 x 8 tile the model will perform best. Counting the over-fetch
     measured best                              = 10.44x  (block 256)
 ```
 
-* The curve leaves the ideal line sharply between n = 2 and n = 4. The
-  next slide asks whether Amdahl's law accounts for that.
+* The curve leaves the ideal line sharply between P = 2 and P = 4.
 
 --------------------------------------------------------------------------------
 
@@ -952,8 +950,7 @@ Run at N = 64 for 500 s.
 
 -> ## Roofline: well below the roof <-
 
-The roofline is CGMA plotted against bytes instead of accesses
-(`I = CGMA / 4 B`), which puts both ceilings on one axis.
+The roofline is CGMA plotted against bytes (`I = CGMA / 4 B`).
 
 ```
    Ridge point = 236 / 25.6 = 9.22 FLOP/B.
@@ -970,10 +967,6 @@ The roofline is CGMA plotted against bytes instead of accesses
 ```
 
 * **The CUDA point moved right.**
-* The "% of roof" column is numerically identical to the "% of peak
-  bandwidth" column on the previous slide. That is not a coincidence:
-  `GFLOPS/roof = (I x BW_eff)/(I x BW_peak) = BW_eff/BW_peak`. The two
-  slides are one measurement seen in two units.
 * All three points sit **10x to 61x below their own memory roof**
   (60.6x sequential, 17.3x OpenMP 8, 9.7x CUDA).
 
@@ -981,7 +974,7 @@ Relevance: the roofline excludes the compute ceiling *and* the bandwidth ceiling
 
 --------------------------------------------------------------------------------
 
-# 32. Closing the Bracket: Profiling the Kernel
+# 32. Profiling the Kernel
 
 To get per-kernel numbers I used `nvprof`:
 
@@ -1012,6 +1005,34 @@ To get per-kernel numbers I used `nvprof`:
 --------------------------------------------------------------------------------
 
 # 33. Summary
+
+* **Throughput Summary — N = 128^3, 100 steps, 3 repeats (mean +/- sigma)**
+
+```
+ Backend          Threads / Block       Time (s)           Throughput    GFLOPS   BW GB/s  % 25.6GB/s  Speedup
+---------------  -------------------  ------------------ -------------   ------  --------- ---------- --------
+Sequential CPU   1 thread, untiled   9.9223 +/- 0.2741  0.02113 GLUPS   0.507   0.423 GB/s   1.65 %   1.000x
+OpenMP CPU       1 thread, tiled     8.9536 +/- 0.0596  0.02343 GLUPS   0.562   0.468 GB/s   1.83 %   1.108x
+OpenMP CPU       2 threads           4.8226 +/- 0.0868  0.04350 GLUPS   1.044   0.870 GB/s   3.40 %   2.057x
+OpenMP CPU       4 threads           2.9353 +/- 0.0168  0.07147 GLUPS   1.715   1.429 GB/s   5.58 %   3.380x
+OpenMP CPU       8 threads           2.8356 +/- 0.0638  0.07397 GLUPS   1.776   1.480 GB/s   5.78 %   3.499x
+OpenMP CPU      16 threads           2.9119 +/- 0.0118  0.07200 GLUPS   1.728   1.440 GB/s   5.63 %   3.408x
+CUDA GPU         64 th/blk (32x2)    1.0812 +/- 0.0006  0.19393 GLUPS   9.310   2.328 GB/s   9.09 %   9.177x
+CUDA GPU        128 th/blk (32x4)    0.9904 +/- 0.0006  0.21173 GLUPS  10.164   2.541 GB/s   9.93 %  10.018x
+CUDA GPU        256 th/blk (32x8)    0.9501 +/- 0.0004  0.22070 GLUPS  10.595   2.649 GB/s  10.35 %  10.443x
+CUDA GPU        512 th/blk (32x16)   0.9629 +/- 0.0004  0.21777 GLUPS  10.454   2.614 GB/s  10.21 %  10.304x
+CUDA GPU       1024 th/blk (32x32)   1.0506 +/- 0.0003  0.19963 GLUPS   9.582   2.395 GB/s   9.36 %   9.444x
+```
+
+* **Large-Grid Scaling — N = 384^3 (56.6 M cells, 27x the cells)**
+
+```
+   Backend          Threads / Block       Time (s)            Throughput       Speedup vs Seq
+  ---------------  -------------------  ------------------  ---------------  ----------------
+   Sequential CPU   1 thread, untiled   290.022 +/- 0.405   0.01950 GLUPS         1.000x
+   OpenMP CPU       8 threads            77.751 +/- 0.108   0.07280 GLUPS         3.730x
+   CUDA GPU         256 th/block         25.878 +/- 0.004   0.21880 GLUPS        11.207x
+```
 
 <br>
 
