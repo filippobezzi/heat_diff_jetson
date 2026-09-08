@@ -246,18 +246,18 @@ def plot_execution_times(reduced_csv=None, output_fig_path=None):
     ax1.axhline(y=t_seq_red, color='#D9381E', linestyle='--', linewidth=1.8, label=f"Sequential ({t_seq_red:.3f} s)")
 
     for idx, (x, y) in enumerate(zip(threads, omp_times)):
-        if idx == 0:  # P=1 (to the left)
+        if idx == 0:  # n=1 (to the left)
             ha, x_off, y_off = 'right', -8, 8
-        elif idx == len(threads) - 1:  # P=8
+        elif idx == len(threads) - 1:  # n=8
             ha, x_off, y_off = 'center', 0, 10
-        else:  # P=2, P=4
+        else:  # n=2, n=4
             ha, x_off, y_off = 'center', 0, 10
         ax1.annotate(f"{y:.3f} s", (x, y), textcoords="offset points", xytext=(x_off, y_off),
                      ha=ha, fontweight='bold', color='#1F77B4')
 
     ax1.set_xlim(0.0, 8.8)
     ax1.set_ylim(0, max(t_seq_red, max(omp_times)) * 1.35)
-    ax1.set_xlabel("OpenMP Threads ($P$)", fontweight="bold")
+    ax1.set_xlabel("OpenMP Threads ($n$)", fontweight="bold")
     ax1.set_ylabel("Execution Time (s)", fontweight="bold")
     ax1.set_xticks(threads)
     ax1.grid(True, linestyle="--", alpha=0.5)
@@ -323,10 +323,10 @@ def plot_speedup_ideal(reduced_csv=None, output_fig_path=None):
     # Two baselines: vs the untiled sequential solver (tiling + threading) and
     # vs 1-thread OpenMP (threading alone).  Only the second is parallel scaling.
     ax1.plot(threads, speedup_omp1, 'o-', color='#1F77B4', markersize=8, linewidth=2.5,
-             label=r"Threading only ($T_{\mathrm{omp}(1)} / T_{\mathrm{omp}(P)}$)")
+             label=r"Threading only ($T_{\mathrm{omp}(1)} / T_{\mathrm{omp}(n)}$)")
     ax1.plot(threads, speedup_omp, 's--', color='#8C564B', markersize=7, linewidth=2.0,
-             alpha=0.9, label=r"Tiling + threading ($T_{\mathrm{seq}} / T_{\mathrm{omp}(P)}$)")
-    ax1.plot(threads, threads, '--', color='gray', alpha=0.7, label=r"Ideal Linear Scaling ($S=P$)")
+             alpha=0.9, label=r"Tiling + threading ($T_{\mathrm{seq}} / T_{\mathrm{omp}(n)}$)")
+    ax1.plot(threads, threads, '--', color='gray', alpha=0.7, label=r"Ideal Linear Scaling ($S=n$)")
     ax1.axhline(y=1.0, color='#D9381E', linestyle=':', label="Baseline ($S=1.0$)")
 
     for idx, (x, y) in enumerate(zip(threads, speedup_omp1)):
@@ -336,7 +336,7 @@ def plot_speedup_ideal(reduced_csv=None, output_fig_path=None):
                      ha=ha, va=va, fontweight='bold', color='#1F77B4')
 
     ax1.set_xlim(0.0, 8.8)
-    ax1.set_xlabel("OpenMP Threads ($P$)", fontweight="bold")
+    ax1.set_xlabel("OpenMP Threads ($n$)", fontweight="bold")
     ax1.set_ylabel("Speedup Factor", fontweight="bold")
     ax1.set_xticks(threads)
     ax1.set_ylim(0, max(max(threads), np.nanmax(speedup_omp)) * 1.18)
